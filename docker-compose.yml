@@ -1,0 +1,94 @@
+version: "3"
+services:
+    pika:
+        build:
+            context: ./.
+            dockerfile: Dockerfile
+        image: pika:3.3.5
+        container_name: pika
+        restart: always
+        network_mode: host
+        volumes:
+            - /data/pika:/data
+        environment:
+            - PIKA_PORT=9222
+            - PIKA_REQUIREPASS=pika3
+            - PIKA_MASTERAUTH=pika3
+            - PIKA_USERPASS=pika3
+            - PIKA_LOG_PATH=/data/log/
+            - PIKA_DB_PATH=/data/log/
+            - PIKA_DUMP_PATH=/data/log/
+            - PIKA_DB_SYNC_PATH=/data/dbsync/
+    pika_slave:
+        image: pika:3.3.5
+        container_name: pika_slave
+        restart: always
+        network_mode: host
+        volumes:
+            - /data/pika_slave:/data
+        environment:
+            - PIKA_MASTER_IP=192.168.1.2
+            - PIKA_MASTER_PORT=9222
+            - PIKA_PORT=9223
+            - PIKA_REQUIREPASS=pika3
+            - PIKA_MASTERAUTH=pika3
+            - PIKA_USERPASS=pika3
+            - PIKA_LOG_PATH=/data/log/
+            - PIKA_DB_PATH=/data/log/
+            - PIKA_DUMP_PATH=/data/log/
+            - PIKA_DB_SYNC_PATH=/data/dbsync/
+    s1:
+        build:
+            context: ./.
+            dockerfile: ./sentinel/Dockerfile
+        image: sentinel:3.2.11
+        volumes:
+            - /data/sentinel:/data
+        depends_on:
+            - pika
+        network_mode: host
+        environment:
+            - PIKA_MASTER_IP=192.168.1.2
+            - PIKA_MASTER_PORT=9222
+            - PIKA_USERPASS=pika3
+            - SENTINEL_PORT=26379
+            - SENTINEL_DOWN_AFTER=3000
+            - SENTINEL_QUORUM=2
+            - SENTINEL_FAILOVER=3000
+    s2:
+        image: sentinel:3.2.11
+        volumes:
+            - /data/sentinel:/data
+        depends_on:
+            - pika_slave
+        network_mode: host
+        environment:
+            - PIKA_MASTER_IP=192.168.1.2
+            - PIKA_MASTER_PORT=9222
+            - PIKA_USERPASS=pika3
+            - SENTINEL_PORT=26380
+            - SENTINEL_DOWN_AFTER=3000
+            - SENTINEL_QUORUM=2
+            - SENTINEL_FAILOVER=3000
+    s3:
+        image: sentinel:3.2.11
+        volumes:
+            - /data/sentinel:/data
+        network_mode: host
+        depends_on:
+            - pika_slave
+        environment:
+            - PIKA_MASTER_IP=192.168.1.2
+            - PIKA_MASTER_PORT=9222
+            - PIKA_USERPASS=pika3
+            - SENTINEL_PORT=26381
+            - SENTINEL_DOWN_AFTER=3000
+            - SENTINEL_QUORUM=2
+            - SENTINEL_FAILOVER=3000
+
+# docker run -p 11000:80  --network=host  -it -v /data/test:/data --name ori ori:1.0 /bin/bash
+# docker rm -f ori && docker rmi ori:1.0
+# docker rmi ori:1.0
+# docker build  -t ori:1 ./
+
+#docker run -p 11000:26392   -it -v /data/sentinel:/data --name s1 sentinel:3.2.11 /bin/bash
